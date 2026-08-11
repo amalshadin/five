@@ -1,11 +1,31 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
 #define PORT 9002
+#define MAX 100
+
+// Send exactly n bytes
+int send_all(int socket, void *buffer, int n)
+{
+    int total = 0;
+    int bytes;
+
+    while (total < n)
+    {
+        bytes = send(socket, (char *)buffer + total, n - total, 0);
+
+        if (bytes <= 0)
+            return -1;
+
+        total += bytes;
+    }
+
+    return total;
+}
 
 int main()
 {
@@ -13,7 +33,7 @@ int main()
     struct sockaddr_in server_addr;
 
     int n;
-    int matrix[100][100];
+    int matrix[MAX][MAX];
 
     char result[50];
 
@@ -46,46 +66,53 @@ int main()
     printf("Enter the order of the matrix: ");
     scanf("%d", &n);
 
-    if (n <= 0 || n > 100)
+    if (n <= 0 || n > MAX)
     {
         printf("Invalid matrix order.\n");
         close(sock);
         return 1;
     }
 
-    // Seed random number generator
-    srand(time(NULL));
-
-    // Generate matrix
-    printf("\nGenerated Matrix:\n");
+    // Read matrix elements
+    printf("Enter the matrix elements:\n");
 
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < n; j++)
         {
-            matrix[i][j] = (rand() % 50) + 1;
-            printf("%4d ", matrix[i][j]);
+            scanf("%d", &matrix[i][j]);
+        }
+    }
+
+    // Display matrix
+    printf("\nEntered Matrix:\n");
+
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            printf("%d ", matrix[i][j]);
         }
         printf("\n");
     }
 
-    // Send matrix order
-    if (send(sock, &n, sizeof(n), 0) < 0)
+    // Send n
+    if (send_all(sock, &n, sizeof(n)) < 0)
     {
         perror("Failed to send n");
         close(sock);
         exit(1);
     }
 
-    // Send matrix
-    if (send(sock, matrix, sizeof(int) * n * n, 0) < 0)
+    // Send complete matrix
+    if (send_all(sock, matrix, sizeof(int) * n * n) < 0)
     {
         perror("Failed to send matrix");
         close(sock);
         exit(1);
     }
 
-    // Receive matrix type
+    // Receive result
     if (recv(sock, result, sizeof(result), 0) <= 0)
     {
         perror("Failed to receive result");
